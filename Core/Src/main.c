@@ -340,6 +340,10 @@ void StartTask3(void *argument)
 
 	//high prio task: blink every 200ms
 
+	//	When two tasks share the same priority and both are in the ready state, FreeRTOS will switch between them
+	//	using round-robin scheduling — giving each one an equal slice of CPU time. Just make sure both tasks call
+	//	osDelay() at some point, otherwise one task can starve the other.
+
   /* Infinite loop */
   for(;;)
   {
@@ -362,6 +366,12 @@ void StartTask4(void *argument)
 
 	//highest prio task: control task 3 lifecycle using osThreadSuspend() and osThreadResume()
 	//suspended task is still fully stored in the heap memory and can be resumed again.
+
+	//osThreadTerminate() - permanently delete the task and free the memory, use for one time init tasks
+	//osThreadGetId() - returns the ID of the currently running thread(task)
+	//osThreadGetState() - queries the current state of any thread (running, ready, blocked)
+	//osThreadGetPriority() - reads the current priority of any thread
+	//osThreadSetPriority() - changes it during runtime
 
   /* Infinite loop */
   for(;;)
