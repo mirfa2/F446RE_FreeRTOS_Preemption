@@ -239,6 +239,7 @@ void SystemClock_Config(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
@@ -246,6 +247,27 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5|GPIO_PIN_10, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PA5 PA10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -266,10 +288,15 @@ static void MX_GPIO_Init(void)
 void StartTask1(void *argument)
 {
   /* USER CODE BEGIN 5 */
+
+	//lowest prio task: blink every 1s. Due to task 2 preempting task 1, the red led seems to blink at the same rate as task2's blue led.
+	// this is because task1 only gets to run when no higher order task is running, meaning only when task2,3,4 are in waiting/blocked state
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
+	  osDelay(1000);	//blocks the task for 1s, task is in Waiting state until delay over or event happens, let other tasks run
   }
   /* USER CODE END 5 */
 }
@@ -284,10 +311,18 @@ void StartTask1(void *argument)
 void StartTask2(void *argument)
 {
   /* USER CODE BEGIN StartTask2 */
+
+	//mid prio task: blink every 500ms, due to the simulated cpu hogging, led will blink at much slower rate
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_10);
+	  osDelay(500);
+
+	  //represent 50 millions cycles processing time. lower prio task get starved, higher prio can preempts this task
+	  volatile uint32_t wait = 50000000;	//volatile: var can change at anytime without any current code action (due to hardware, ISR, etc)
+	  while(wait--);						//the modifier tells compiler not to optimize the var (store in cache), but read directly from memory
   }
   /* USER CODE END StartTask2 */
 }
@@ -302,10 +337,14 @@ void StartTask2(void *argument)
 void StartTask3(void *argument)
 {
   /* USER CODE BEGIN StartTask3 */
+
+	//high prio task: blink every 200ms
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+	  osDelay(200);
   }
   /* USER CODE END StartTask3 */
 }
@@ -320,10 +359,17 @@ void StartTask3(void *argument)
 void StartTask4(void *argument)
 {
   /* USER CODE BEGIN StartTask4 */
+
+	//highest prio task: control task 3 lifecycle using osThreadSuspend() and osThreadResume()
+	//suspended task is still fully stored in the heap memory and can be resumed again.
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	    osDelay(1000);
+	    osThreadSuspend(Task3Handle);
+	    osDelay(5000);
+	    osThreadResume(Task3Handle);
   }
   /* USER CODE END StartTask4 */
 }
